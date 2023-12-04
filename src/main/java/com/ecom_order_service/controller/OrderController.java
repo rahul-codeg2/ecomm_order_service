@@ -1,6 +1,6 @@
 package com.ecom_order_service.controller;
 
-import com.ecom_order_service.model.OrderRequest;
+import com.ecom_order_service.dto.OrderRequest;
 import com.ecom_order_service.model.Orders;
 import com.ecom_order_service.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,22 +10,21 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/ecomm")
 public class OrderController
 {
     @Autowired
     private OrderService orderService;
-    @PostMapping("/home/place-order")
-    public ResponseEntity<Orders> placeOrder(@RequestBody OrderRequest orderRequest)
+    @PostMapping("/place-order")
+    public ResponseEntity<Orders> placeOrder(@RequestBody OrderRequest orderRequest,@RequestHeader("Authorization") String token)
     {
-        return orderService.placeOrder(orderRequest);
+        return orderService.placeOrder(orderRequest,token);
 
     }
 
-    @GetMapping("/home/get-all-orders")
-    public ResponseEntity <List<Orders>> getAllOrders()
+    @GetMapping("/orders")
+    public ResponseEntity <List<Orders>> getAllOrders(@RequestHeader("Authorization") String token)
     {
-        return orderService.getAllOrders();
+        return orderService.getAllOrders(token);
 
     }
 }

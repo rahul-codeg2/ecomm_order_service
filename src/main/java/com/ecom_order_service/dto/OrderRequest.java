@@ -1,4 +1,4 @@
-package com.ecom_order_service.model;
+package com.ecom_order_service.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

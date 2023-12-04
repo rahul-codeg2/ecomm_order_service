@@ -20,6 +20,7 @@ public class Order_product
     private int id;
     private int order_id;
     private int product_id;
+    private int quantity;
 
 
 

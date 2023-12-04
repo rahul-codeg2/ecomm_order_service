@@ -1,12 +1,15 @@
 package com.ecom_order_service.service;
 
-import com.ecom_order_service.model.OrderRequest;
+import com.ecom_order_service.dto.OrderRequest;
 import com.ecom_order_service.model.Order_product;
 import com.ecom_order_service.model.Orders;
-import com.ecom_order_service.model.ProductStockResponse;
+import com.ecom_order_service.dto.ProductStockResponse;
 import com.ecom_order_service.repository.OrderRepository;
 import com.ecom_order_service.repository.Order_productRepository;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -16,8 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.util.Date;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -31,7 +34,10 @@ public class OrderService {
     @Autowired
     private RestTemplate restTemplate;
 
-    public ResponseEntity<Orders> placeOrder(OrderRequest orderRequest) {
+    @Value("${jwt.secret-key}")
+    private String secret;
+
+    public ResponseEntity<Orders> placeOrder(OrderRequest orderRequest,String token) {
         double total_amount = 0;
         Orders new_order = new Orders();
         List<ProductStockResponse> productListWithAvailableStock = checkProductStock(orderRequest.getProduct_ids());
@@ -62,42 +68,56 @@ public class OrderService {
         }
         reduceProductStock(productListWithAvailableStock);
         return new ResponseEntity<Orders>(new_order, HttpStatus.OK);
-
-
     }
-
     private void reduceProductStock(List<ProductStockResponse> productListWithAvailableStock) {
         String productServiceUrl = "http://localhost:9001/ecomm/home/reduce-stock";
         RequestEntity<List<ProductStockResponse>> requestEntity = new RequestEntity<>(productListWithAvailableStock, HttpMethod.POST, URI.create(productServiceUrl));
 
         ParameterizedTypeReference<List<ProductStockResponse>> responseType = new ParameterizedTypeReference<List<ProductStockResponse>>() {
         };
-
-
         ResponseEntity<List<ProductStockResponse>> responseEntity = restTemplate.exchange(requestEntity, responseType);
 
     }
-
     public List<ProductStockResponse> checkProductStock(List<Integer> product_ids) {
 
         String productServiceUrl = "http://localhost:9001/ecomm/home/check-stock";
-
-
         RequestEntity<List<Integer>> requestEntity = new RequestEntity<>(product_ids, HttpMethod.POST, URI.create(productServiceUrl));
-
 
         ParameterizedTypeReference<List<ProductStockResponse>> responseType = new ParameterizedTypeReference<List<ProductStockResponse>>() {
         };
-
 
         ResponseEntity<List<ProductStockResponse>> responseEntity = restTemplate.exchange(requestEntity, responseType);
         List<ProductStockResponse> productListWithAvailableStock = responseEntity.getBody().stream().filter(product -> product.getAvailable_stock() > 0).collect(Collectors.toList());
 
         return productListWithAvailableStock;
     }
-
-    public ResponseEntity<List<Orders>> getAllOrders()
+    public ResponseEntity<List<Orders>> getAllOrders(String token)
     {
-        return new ResponseEntity<>(orderRepository.findAll(),HttpStatus.OK);
+        if (validateJwtToken(token))
+        {
+            return new ResponseEntity<>(orderRepository.findAll(),HttpStatus.OK);
+        }
+        else
+        {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+    }
+    public boolean validateJwtToken(String jwtToken) {
+        try {
+            Claims claims = Jwts.parser().setSigningKey(secret).parseClaimsJws(jwtToken.substring(7)).getBody();
+
+            // Extract user details from claims
+            String email = claims.getSubject();
+            int user_id = (int) claims.get("userId");
+            Date expirationDate = claims.getExpiration();
+            if (expirationDate != null && expirationDate.before(new Date())) {
+                // Token has expired
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid JWT token");
+        }
     }
 }
