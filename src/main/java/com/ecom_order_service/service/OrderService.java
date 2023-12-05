@@ -37,7 +37,9 @@ public class OrderService {
     @Value("${jwt.secret-key}")
     private String secret;
 
-    public ResponseEntity<Orders> placeOrder(OrderRequest orderRequest,String token) {
+    public ResponseEntity<Orders> placeOrder(OrderRequest orderRequest,String token)
+    {
+        Claims claims=validateJwtToken(token);
         double total_amount = 0;
         Orders new_order = new Orders();
         List<ProductStockResponse> productListWithAvailableStock = checkProductStock(orderRequest.getProduct_ids());
@@ -50,7 +52,7 @@ public class OrderService {
             new_order.setOrder_status("Success");
             new_order.setTotal_amount(total_amount);
             new_order.setQuantity(productListWithAvailableStock.size());
-            new_order.setUser_id(orderRequest.getUser_id());
+            new_order.setUser_id((int)claims.get("userId"));
             orderRepository.save(new_order);
 
 
@@ -93,17 +95,10 @@ public class OrderService {
     }
     public ResponseEntity<List<Orders>> getAllOrders(String token)
     {
-        if (validateJwtToken(token))
-        {
-            return new ResponseEntity<>(orderRepository.findAll(),HttpStatus.OK);
-        }
-        else
-        {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
+        validateJwtToken(token);
+        return new ResponseEntity<>(orderRepository.findAll(),HttpStatus.OK);
     }
-    public boolean validateJwtToken(String jwtToken) {
+    public Claims validateJwtToken(String jwtToken) {
         try {
             Claims claims = Jwts.parser().setSigningKey(secret).parseClaimsJws(jwtToken.substring(7)).getBody();
 
@@ -113,9 +108,10 @@ public class OrderService {
             Date expirationDate = claims.getExpiration();
             if (expirationDate != null && expirationDate.before(new Date())) {
                 // Token has expired
-                return false;
+                throw new RuntimeException("JWT token has expired");
             }
-            return true;
+            return  claims;
+
         } catch (Exception e) {
             throw new RuntimeException("Invalid JWT token");
         }
